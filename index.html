@@ -177,6 +177,11 @@ input[type=file] { display: none; }
         <div class="data-tag" id="data-tag" style="display:none"><span class="data-dot"></span><span id="data-rows">0행</span></div>
         <div class="month-badge" id="period-badge">데이터 없음</div>
         <button class="clear-btn" id="clear-btn" onclick="clearData()" style="display:none">초기화</button>
+        <button id="backup-btn" onclick="backupData()" style="display:none;align-items:center;gap:7px;background:transparent;color:var(--accent2);font-family:var(--mono);font-size:12px;padding:8px 14px;border-radius:6px;border:1px solid rgba(90,245,200,0.3);cursor:pointer;transition:all 0.15s">↓ 백업</button>
+        <label class="upload-btn" style="background:var(--surface2);color:var(--text);border:1px solid var(--border2)" title="백업 파일 복원">
+          ↑ 복원
+          <input type="file" id="restore-file" accept=".json" onchange="restoreData(event)">
+        </label>
         <label class="upload-btn">
           ↑ 엑셀 업로드
           <input type="file" id="excel-file" accept=".xlsx,.xls" onchange="handleUpload(event)">
@@ -549,7 +554,62 @@ let charts = {};
 
 // STORAGE
 function save() {
-  try { localStorage.setItem('sellout_v2', JSON.stringify(allData)); } catch(e) {}
+  try {
+    localStorage.setItem('sellout_v2', JSON.stringify(allData));
+  } catch(e) {
+    // localStorage 용량 초과 시 자동 백업 유도
+    alert('저장 공간이 부족합니다. 백업 후 일부 데이터를 정리해주세요.');
+  }
+}
+
+function backupData() {
+  if (!allData.length) return;
+  const backup = {
+    version: 'sellout_v2',
+    exported_at: new Date().toISOString(),
+    count: allData.length,
+    months: months,
+    data: allData
+  };
+  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `sellout_backup_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function restoreData(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const backup = JSON.parse(ev.target.result);
+      if (!backup.data || !Array.isArray(backup.data)) {
+        alert('올바른 백업 파일이 아닙니다.');
+        return;
+      }
+      if (!confirm(`백업 데이터 ${backup.count.toLocaleString()}행을 복원하시겠습니까?\n현재 데이터에 병합됩니다.`)) return;
+      // 기존 데이터와 병합
+      const map = new Map();
+      [...allData, ...backup.data].forEach(r => {
+        const k = \`\${r.month}||\${r.pharmacy}||\${r.item}\`;
+        if (map.has(k)) { const ex = map.get(k); ex.qty += r.qty; ex.amount += r.amount; }
+        else map.set(k, { ...r });
+      });
+      allData = [...map.values()];
+      save();
+      processMonths();
+      showDashboard();
+      alert('복원 완료!');
+    } catch(err) {
+      alert('파일을 읽는 중 오류가 발생했습니다.');
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
 }
 function load() {
   try { const d = localStorage.getItem('sellout_v2'); return d ? JSON.parse(d) : []; } catch(e) { return []; }
@@ -643,6 +703,7 @@ function clearData() {
   document.getElementById('empty-state').style.display = 'flex';
   document.getElementById('data-tag').style.display = 'none';
   document.getElementById('clear-btn').style.display = 'none';
+  document.getElementById('backup-btn').style.display = 'none';
   document.getElementById('period-badge').textContent = '데이터 없음';
 }
 
@@ -697,6 +758,7 @@ function showDashboard() {
   document.getElementById('empty-state').style.display = 'none';
   document.getElementById('data-tag').style.display = 'inline-flex';
   document.getElementById('clear-btn').style.display = 'flex';
+  document.getElementById('backup-btn').style.display = 'flex';
   document.getElementById('data-rows').textContent = allData.length.toLocaleString() + '행';
   if (months.length) {
     document.getElementById('period-badge').textContent = months.length === 1
