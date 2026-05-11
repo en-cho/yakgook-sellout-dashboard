@@ -145,8 +145,18 @@ input[type=file] { display: none; }
     <div class="nav-item active" onclick="showView('dashboard')"><span class="nav-dot"></span>대시보드</div>
     <div class="nav-item" onclick="showView('items')"><span class="nav-dot"></span>품목 분석</div>
     <div class="nav-item" onclick="showView('pharmacy')"><span class="nav-dot"></span>약국 분석</div>
+    <div class="nav-item" onclick="showView('pivot-pharm')"><span class="nav-dot"></span>약국별 피벗</div>
+    <div class="nav-item" onclick="showView('pivot-item')"><span class="nav-dot"></span>제품별 피벗</div>
     <div class="nav-item" onclick="showView('data')"><span class="nav-dot"></span>데이터 관리</div>
 
+    <div style="padding:16px 20px;border-top:1px solid var(--border)">
+      <div class="nav-label" style="margin-bottom:8px">브랜드 필터</div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <div class="month-chip active" id="brand-all" onclick="filterBrand('__all__',this)">전체</div>
+        <div class="month-chip" id="brand-celimax" onclick="filterBrand('celimax',this)">Celimax / 셀리맥스</div>
+        <div class="month-chip" id="brand-others" onclick="filterBrand('others',this)">타사 브랜드</div>
+      </div>
+    </div>
     <div class="sidebar-bottom">
       <div class="nav-label" style="margin-bottom:8px">월별 필터</div>
       <div id="month-chips" class="month-chips">
@@ -274,17 +284,65 @@ input[type=file] { display: none; }
         </div>
       </div>
 
+
+      <!-- PIVOT PHARM -->
+      <div id="view-pivot-pharm" style="display:none">
+        <div class="card">
+          <div class="card-header" style="flex-wrap:wrap;gap:10px">
+            <div class="card-title">약국별 월별 피벗</div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <select class="card-select" id="pivot-pharm-sel" onchange="renderPivotPharm()" style="min-width:160px"></select>
+              <select class="card-select" id="pivot-pharm-brand-sel" onchange="renderPivotPharm()" style="min-width:120px"></select>
+              <label style="display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:11px;color:var(--muted);cursor:pointer"><input type="checkbox" id="pivot-pharm-pct" onchange="renderPivotPharm()" style="accent-color:var(--accent)"> 증감률 표시</label>
+            </div>
+          </div>
+          <div style="overflow-x:auto"><table class="item-table" id="pivot-pharm-table"></table></div>
+        </div>
+      </div>
+
+      <!-- PIVOT ITEM -->
+      <div id="view-pivot-item" style="display:none">
+        <div class="card">
+          <div class="card-header" style="flex-wrap:wrap;gap:10px">
+            <div class="card-title">제품별 약국 비교 피벗</div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <select class="card-select" id="pivot-item-sel" onchange="renderPivotItem()" style="min-width:220px"></select>
+              <label style="display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:11px;color:var(--muted);cursor:pointer"><input type="checkbox" id="pivot-item-pct" onchange="renderPivotItem()" style="accent-color:var(--accent)"> 증감률 표시</label>
+            </div>
+          </div>
+          <div style="overflow-x:auto"><table class="item-table" id="pivot-item-table"></table></div>
+        </div>
+      </div>
+
       <!-- DATA -->
       <div id="view-data" style="display:none">
-        <div class="card">
+        <!-- 월별 카드 -->
+        <div class="card" style="margin-bottom:16px">
           <div class="card-header">
-            <div class="card-title">누적 데이터 현황</div>
+            <div class="card-title">월별 데이터 현황</div>
             <div style="font-family:var(--mono);font-size:11px;color:var(--muted)" id="total-rows-label"></div>
           </div>
           <div class="data-month-grid" id="data-month-grid"></div>
+        </div>
+
+        <!-- 상세 행 테이블 -->
+        <div class="card">
+          <div class="card-header" style="flex-wrap:wrap;gap:10px">
+            <div class="card-title">데이터 상세 목록</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+              <select class="card-select" id="data-filter-month" onchange="renderUploadList()" style="min-width:110px">
+                <option value="__all__">전체 월</option>
+              </select>
+              <select class="card-select" id="data-filter-pharm" onchange="renderUploadList()" style="min-width:140px">
+                <option value="__all__">전체 약국</option>
+              </select>
+              <input id="data-filter-search" type="text" placeholder="품목명 검색..." oninput="renderUploadList()"
+                style="background:var(--surface2);border:1px solid var(--border2);color:var(--text);font-size:12px;padding:4px 10px;border-radius:5px;font-family:var(--mono);width:140px">
+            </div>
+          </div>
           <div style="overflow-x:auto">
             <table class="item-table">
-              <thead><tr><th>월</th><th>약국명</th><th>품목명</th><th>수량</th><th>금액</th></tr></thead>
+              <thead><tr><th>월</th><th>약국명</th><th>브랜드</th><th>품목명</th><th style="text-align:right">수량</th><th style="text-align:right">금액</th><th style="text-align:center">삭제</th></tr></thead>
               <tbody id="raw-tbody"></tbody>
             </table>
           </div>
@@ -297,7 +355,7 @@ input[type=file] { display: none; }
 
 <script>
 const COLORS = ['#c8f55a','#5af5c8','#f5a55a','#a55af5','#f55a5a','#5ac8f5','#f5c85a','#c85af5','#5af55a','#f55ac8','#5a5af5','#f5f55a'];
-let allData = [], months = [], selectedMonth = '__all__', currentView = 'dashboard';
+let allData = [], months = [], selectedMonth = '__all__', selectedBrand = '__all__', currentView = 'dashboard';
 let charts = {};
 
 // STORAGE
@@ -334,7 +392,8 @@ function detectCols(data) {
     item: find('품목','제품','상품','약품'),
     qty: find('수량','갯수','개수','qty','Qty'),
     amount: find('금액','매출','amount','판매액','Amount'),
-    month: find('월','month','날짜','일자','date','기간','Month')
+    month: find('월','month','날짜','일자','date','기간','Month'),
+    brand: find('브랜드','brand','Brand')
   };
 }
 
@@ -346,6 +405,7 @@ function mergeData(raw) {
   }
   const newRows = raw.map(r => ({
     month: cols.month ? String(r[cols.month] || '').slice(0, 7) : '미상',
+    brand: cols.brand ? String(r[cols.brand] || '').trim() : '',
     pharmacy: String(r[cols.pharmacy] || '').trim(),
     item: String(r[cols.item] || '').trim(),
     qty: Number(r[cols.qty]) || 0,
@@ -400,6 +460,7 @@ function clearData() {
 function processMonths() {
   months = [...new Set(allData.map(r => r.month))].filter(m => m && m !== '미상').sort();
   buildMonthUI();
+  buildPivotSelects();
 }
 
 function buildMonthUI() {
@@ -411,14 +472,29 @@ function buildMonthUI() {
     const el = document.getElementById(id);
     if (el) el.innerHTML = opts;
   });
+  // Data view filters
+  const dmSel = document.getElementById('data-filter-month');
+  if (dmSel) dmSel.innerHTML = '<option value="__all__">전체 월</option>' + months.map(m => `<option value="${m}">${m}</option>`).join('');
+  const pharmacies = [...new Set(allData.map(r => r.pharmacy))].sort();
+  const dpSel = document.getElementById('data-filter-pharm');
+  if (dpSel) dpSel.innerHTML = '<option value="__all__">전체 약국</option>' + pharmacies.map(p => `<option value="${p}">${p}</option>`).join('');
+}
+
+function filterBrand(b, el) {
+  selectedBrand = b;
+  document.querySelectorAll("#brand-all,#brand-celimax,#brand-others").forEach(c => c.classList.remove("active"));
+  el.classList.add("active");
+  renderCurrentView();
 }
 
 function filterMonth(m, el) {
   selectedMonth = m;
-  document.querySelectorAll('.month-chip').forEach(c => c.classList.remove('active'));
+  // month chips only - exclude brand chips
+  document.querySelectorAll('#month-chips .month-chip').forEach(c => c.classList.remove('active'));
   el.classList.add('active');
   renderCurrentView();
 }
+  selectedMonth = m;
 
 function showDashboard() {
   document.getElementById('empty-state').style.display = 'none';
@@ -434,13 +510,13 @@ function showDashboard() {
 
 function showView(view) {
   currentView = view;
-  ['dashboard','items','pharmacy','data'].forEach(v => {
+  ['dashboard','items','pharmacy','pivot-pharm','pivot-item','data'].forEach(v => {
     document.getElementById('view-' + v).style.display = v === view ? 'block' : 'none';
   });
   document.querySelectorAll('.nav-item').forEach((el, i) => {
-    el.classList.toggle('active', ['dashboard','items','pharmacy','data'][i] === view);
+    el.classList.toggle('active', ['dashboard','items','pharmacy','pivot-pharm','pivot-item','data'][i] === view);
   });
-  document.getElementById('page-title').textContent = { dashboard:'대시보드', items:'품목 분석', pharmacy:'약국 분석', data:'데이터 관리' }[view];
+  document.getElementById('page-title').textContent = { dashboard:'대시보드', items:'품목 분석', pharmacy:'약국 분석', 'pivot-pharm':'약국별 피벗', 'pivot-item':'제품별 피벗', data:'데이터 관리' }[view];
   renderCurrentView();
 }
 
@@ -450,11 +526,29 @@ function renderCurrentView() {
   if (currentView === 'items') renderItems();
   if (currentView === 'pharmacy') renderPharmacyView();
   if (currentView === 'data') renderDataView();
+  if (currentView === 'pivot-pharm') renderPivotPharm();
+  if (currentView === 'pivot-item') renderPivotItem();
+}
+
+function isCelimax(r) {
+  const name = (r.item + " " + (r.brand || "")).toLowerCase();
+  return r.brand === "Celimax" || name.includes("셀리맥스") || name.includes("celimax");
+}
+
+function applyBrandFilter(data) {
+  if (selectedBrand === "celimax") return data.filter(r => isCelimax(r));
+  if (selectedBrand === "others") return data.filter(r => !isCelimax(r));
+  return data;
 }
 
 function filtered(m) {
   const mm = m || selectedMonth;
-  return mm === '__all__' ? allData : allData.filter(r => r.month === mm);
+  const base = mm === "__all__" ? allData : allData.filter(r => r.month === mm);
+  return applyBrandFilter(base);
+}
+
+function filteredAll() {
+  return applyBrandFilter(allData);
 }
 
 function destroyChart(key) {
@@ -465,7 +559,7 @@ function renderDashboard() {
   const m = document.getElementById('dash-month-sel')?.value || selectedMonth;
   const data = filtered(m);
   const prevM = m !== '__all__' ? months[months.indexOf(m) - 1] : null;
-  const prevData = prevM ? allData.filter(r => r.month === prevM) : [];
+  const prevData = prevM ? applyBrandFilter(allData.filter(r => r.month === prevM)) : [];
 
   const totalAmt = data.reduce((s, r) => s + r.amount, 0);
   const totalQty = data.reduce((s, r) => s + r.qty, 0);
@@ -528,8 +622,8 @@ function renderDashboard() {
   });
 
   // Trend
-  const topItems = [...new Set(allData.map(r => r.item))].map(it => ({
-    it, total: allData.filter(r => r.item === it).reduce((s, r) => s + r.amount, 0)
+  const topItems = [...new Set(filteredAll().map(r => r.item))].map(it => ({
+    it, total: filteredAll().filter(r => r.item === it).reduce((s, r) => s + r.amount, 0)
   })).sort((a, b) => b.total - a.total).slice(0, 5).map(r => r.it);
 
   document.getElementById('trend-legend').innerHTML = topItems.map((it, i) =>
@@ -542,7 +636,7 @@ function renderDashboard() {
       labels: months,
       datasets: topItems.map((it, i) => ({
         label: it,
-        data: months.map(mm => allData.filter(r => r.item === it && r.month === mm).reduce((s, r) => s + r.amount, 0)),
+        data: months.map(mm => filteredAll().filter(r => r.item === it && r.month === mm).reduce((s, r) => s + r.amount, 0)),
         borderColor: COLORS[i], backgroundColor: 'transparent', tension: 0.35,
         pointRadius: 3, pointBackgroundColor: COLORS[i], borderWidth: 1.5
       }))
@@ -572,7 +666,7 @@ function renderItems() {
   const m = document.getElementById('items-month-sel')?.value || selectedMonth;
   const data = filtered(m);
   const prevM = m !== '__all__' ? months[months.indexOf(m) - 1] : null;
-  const prevData = prevM ? allData.filter(r => r.month === prevM) : [];
+  const prevData = prevM ? applyBrandFilter(allData.filter(r => r.month === prevM)) : [];
   const totalAmt = data.reduce((s, r) => s + r.amount, 0) || 1;
 
   const rows = [...new Set(data.map(r => r.item))].map(it => {
@@ -604,7 +698,7 @@ function renderPharmacyView() {
   const m = document.getElementById('pharm-month-sel')?.value || selectedMonth;
   const data = filtered(m);
   const prevM = m !== '__all__' ? months[months.indexOf(m) - 1] : null;
-  const prevData = prevM ? allData.filter(r => r.month === prevM) : [];
+  const prevData = prevM ? applyBrandFilter(allData.filter(r => r.month === prevM)) : [];
 
   const rows = [...new Set(data.map(r => r.pharmacy))].map(ph => {
     const amt = data.filter(r => r.pharmacy === ph).reduce((s, r) => s + r.amount, 0);
@@ -643,6 +737,302 @@ function renderPharmacyView() {
 }
 
 function renderDataView() {
+  const byMonth = months.map(m => ({
+    m, cnt: allData.filter(r => r.month === m).length,
+    amt: allData.filter(r => r.month === m).reduce((s, r) => s + r.amount, 0)
+  }));
+  document.getElementById('data-month-grid').innerHTML = byMonth.map(r => `
+    <div class="data-month-card">
+      <div class="data-month-label">${r.m}</div>
+      <div class="data-month-amt">₩${(r.amt/1e6).toFixed(1)}M</div>
+      <div class="data-month-rows">${r.cnt.toLocaleString()}행
+        <button onclick="deleteMonth('${r.m}')" style="margin-left:6px;background:rgba(245,90,90,0.15);border:1px solid rgba(245,90,90,0.3);color:var(--danger);font-size:10px;padding:1px 6px;border-radius:3px;cursor:pointer;font-family:var(--mono)">삭제</button>
+      </div>
+    </div>`).join('');
+  document.getElementById('total-rows-label').textContent = '총 ' + allData.length.toLocaleString() + '행';
+  renderUploadList();
+}
+
+function renderUploadList() {
+  // Group by upload key: month+pharmacy combo = "업로드 단위"
+  const uploads = getUploadGroups();
+  const tbody = document.getElementById('raw-tbody');
+  const note = document.getElementById('raw-note');
+  if (!uploads.length) { tbody.innerHTML = ''; note.textContent = ''; return; }
+
+  // Filter controls
+  const filterMonth = document.getElementById('data-filter-month')?.value || '__all__';
+  const filterPharm = document.getElementById('data-filter-pharm')?.value || '__all__';
+  const filterSearch = (document.getElementById('data-filter-search')?.value || '').toLowerCase();
+
+  let rows = allData;
+  if (filterMonth !== '__all__') rows = rows.filter(r => r.month === filterMonth);
+  if (filterPharm !== '__all__') rows = rows.filter(r => r.pharmacy === filterPharm);
+  if (filterSearch) rows = rows.filter(r => r.item.toLowerCase().includes(filterSearch) || r.pharmacy.toLowerCase().includes(filterSearch));
+
+  tbody.innerHTML = rows.slice(0, 300).map((r, i) => `
+    <tr>
+      <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${r.month}</td>
+      <td>${r.pharmacy}</td>
+      <td style="color:var(--muted);font-size:11px">${r.brand || ''}</td>
+      <td>${r.item}</td>
+      <td style="text-align:right;font-family:var(--mono);font-size:12px">${r.qty.toLocaleString()}</td>
+      <td style="text-align:right;font-family:var(--mono);font-size:12px;color:var(--accent)">₩${r.amount.toLocaleString()}</td>
+      <td style="text-align:center">
+        <button onclick="deleteRow(${allData.indexOf(r)})" style="background:rgba(245,90,90,0.1);border:1px solid rgba(245,90,90,0.3);color:var(--danger);font-size:11px;padding:2px 8px;border-radius:3px;cursor:pointer">삭제</button>
+      </td>
+    </tr>`).join('');
+  note.textContent = rows.length > 300 ? `* 전체 ${rows.length.toLocaleString()}행 중 300행 표시` : `총 ${rows.length.toLocaleString()}행`;
+}
+
+function getUploadGroups() {
+  const groups = new Map();
+  allData.forEach(r => {
+    const k = r.month + '||' + r.pharmacy;
+    if (!groups.has(k)) groups.set(k, { month: r.month, pharmacy: r.pharmacy, cnt: 0, amt: 0 });
+    groups.get(k).cnt++;
+    groups.get(k).amt += r.amount;
+  });
+  return [...groups.values()].sort((a,b) => a.month.localeCompare(b.month) || a.pharmacy.localeCompare(b.pharmacy));
+}
+
+function deleteMonth(m) {
+  if (!confirm(`${m} 데이터 전체를 삭제하시겠습니까?`)) return;
+  allData = allData.filter(r => r.month !== m);
+  save(); processMonths(); renderDataView();
+}
+
+function deletePharmacyMonth(month, pharmacy) {
+  if (!confirm(`${pharmacy} / ${month} 데이터를 삭제하시겠습니까?`)) return;
+  allData = allData.filter(r => !(r.month === month && r.pharmacy === pharmacy));
+  save(); processMonths(); renderDataView();
+}
+
+function deleteRow(idx) {
+  if (!confirm('이 항목을 삭제하시겠습니까?')) return;
+  allData.splice(idx, 1);
+  save(); processMonths(); renderDataView();
+}
+
+// ── PIVOT HELPERS ──────────────────────────────────────────────
+function buildPivotSelects() {
+  const pharmacies = [...new Set(allData.map(r => r.pharmacy))].sort();
+  const items = [...new Set(allData.map(r => r.item))].sort();
+  const brands = ['전체 브랜드', ...new Set(allData.map(r => r.brand || '기타').filter(b => b))].sort();
+
+  const pharmSel = document.getElementById('pivot-pharm-sel');
+  const brandSel = document.getElementById('pivot-pharm-brand-sel');
+  const itemSel = document.getElementById('pivot-item-sel');
+  if (pharmSel) pharmSel.innerHTML = pharmacies.map(p => `<option value="${p}">${p}</option>`).join('');
+  if (brandSel) brandSel.innerHTML = brands.map(b => `<option value="${b}">${b}</option>`).join('');
+  if (itemSel) itemSel.innerHTML = items.map(i => `<option value="${i}">${i}</option>`).join('');
+}
+
+function fmtAmt(v) {
+  if (!v) return '-';
+  if (v >= 1e8) return '₩' + (v/1e8).toFixed(1) + '억';
+  if (v >= 1e6) return '₩' + (v/1e6).toFixed(1) + 'M';
+  return '₩' + (v/1e4).toFixed(0) + '만';
+}
+function fmtPct(curr, prev) {
+  if (!prev || !curr) return '';
+  const d = ((curr - prev) / prev * 100).toFixed(0);
+  const cls = d >= 0 ? 'color:var(--accent)' : 'color:var(--danger)';
+  return `<div style="font-size:10px;${cls};font-family:var(--mono)">${d >= 0 ? '▲' : '▼'}${Math.abs(d)}%</div>`;
+}
+
+function renderPivotPharm() {
+  const pharm = document.getElementById('pivot-pharm-sel')?.value;
+  const brandFilter = document.getElementById('pivot-pharm-brand-sel')?.value || '전체 브랜드';
+  const showPct = document.getElementById('pivot-pharm-pct')?.checked;
+  if (!pharm) return;
+
+  let rows = allData.filter(r => r.pharmacy === pharm);
+  if (brandFilter !== '전체 브랜드') rows = rows.filter(r => (r.brand || '기타') === brandFilter);
+
+  // get brands → items structure
+  const brandMap = new Map();
+  rows.forEach(r => {
+    const b = r.brand || '기타';
+    if (!brandMap.has(b)) brandMap.set(b, new Map());
+    const itemMap = brandMap.get(b);
+    if (!itemMap.has(r.item)) itemMap.set(r.item, {});
+    const mData = itemMap.get(r.item);
+    if (!mData[r.month]) mData[r.month] = { qty: 0, amt: 0 };
+    mData[r.month].qty += r.qty;
+    mData[r.month].amt += r.amount;
+  });
+
+  // group months into quarters
+  const q4months = months.filter(m => m >= '2025-10' && m <= '2025-12');
+  const q1months = months.filter(m => m >= '2026-01' && m <= '2026-03');
+  const q2months = months.filter(m => m >= '2026-04' && m <= '2026-06');
+  const allMonthGroups = [
+    ...q4months.length ? [{ label: '2025 4Q', months: q4months }] : [],
+    ...q1months.length ? [{ label: '2026 1Q', months: q1months }] : [],
+    ...q2months.length ? [{ label: '2026 2Q', months: q2months }] : [],
+  ];
+  const flatMonths = [...q4months, ...q1months, ...q2months].filter(m => months.includes(m));
+
+  // Build header
+  let thead = '<thead>';
+  // Row 1: quarter groups
+  thead += '<tr><th rowspan="2">브랜드/제품명</th><th rowspan="2" style="text-align:right">정가</th>';
+  allMonthGroups.forEach(g => {
+    thead += `<th colspan="${g.months.length + 1}" style="text-align:center;background:var(--surface2);border-left:1px solid var(--border2)">${g.label}</th>`;
+  });
+  thead += '</tr>';
+  // Row 2: individual months + Q total
+  thead += '<tr>';
+  allMonthGroups.forEach(g => {
+    g.months.forEach(m => {
+      thead += `<th style="text-align:right;border-left:1px solid var(--border2)">${m.slice(5)}월</th>`;
+    });
+    thead += `<th style="text-align:right;background:rgba(200,245,90,0.06);border-left:1px solid var(--border2)">합계</th>`;
+  });
+  thead += '</tr></thead>';
+
+  // Build body
+  let tbody = '<tbody>';
+  let grandAmt = {};
+  flatMonths.forEach(m => grandAmt[m] = 0);
+
+  brandMap.forEach((itemMap, brand) => {
+    // Brand subtotal row
+    let brandAmts = {};
+    flatMonths.forEach(m => brandAmts[m] = 0);
+    itemMap.forEach((mData) => {
+      flatMonths.forEach(m => { if (mData[m]) brandAmts[m] += mData[m].amt; });
+    });
+    flatMonths.forEach(m => grandAmt[m] += brandAmts[m]);
+
+    tbody += `<tr style="background:rgba(200,245,90,0.04)">`;
+    tbody += `<td style="font-weight:600;color:var(--accent)">${brand}</td><td></td>`;
+    allMonthGroups.forEach(g => {
+      g.months.forEach((m, mi) => {
+        const amt = brandAmts[m] || 0;
+        const prev = mi > 0 ? (brandAmts[g.months[mi-1]] || 0) : 0;
+        tbody += `<td style="text-align:right;border-left:1px solid var(--border2)">${fmtAmt(amt)}${showPct && mi > 0 ? fmtPct(amt, prev) : ''}</td>`;
+      });
+      const qTotal = g.months.reduce((s, m) => s + (brandAmts[m] || 0), 0);
+      tbody += `<td style="text-align:right;background:rgba(200,245,90,0.06);font-weight:500;border-left:1px solid var(--border2)">${fmtAmt(qTotal)}</td>`;
+    });
+    tbody += '</tr>';
+
+    // Item rows
+    itemMap.forEach((mData, item) => {
+      tbody += `<tr>`;
+      tbody += `<td style="padding-left:20px;color:var(--text)">${item}</td><td></td>`;
+      allMonthGroups.forEach(g => {
+        g.months.forEach((m, mi) => {
+          const d = mData[m];
+          const amt = d?.amt || 0;
+          const qty = d?.qty || 0;
+          const prev = mi > 0 ? (mData[g.months[mi-1]]?.amt || 0) : 0;
+          const cell = amt ? `<div style="font-family:var(--mono);font-size:12px">${fmtAmt(amt)}</div><div style="font-size:10px;color:var(--muted)">${qty.toLocaleString()}개</div>` : '<span style="color:var(--muted)">-</span>';
+          tbody += `<td style="text-align:right;border-left:1px solid var(--border2)">${cell}${showPct && mi > 0 && amt && prev ? fmtPct(amt, prev) : ''}</td>`;
+        });
+        const qAmt = g.months.reduce((s, m) => s + (mData[m]?.amt || 0), 0);
+        const qQty = g.months.reduce((s, m) => s + (mData[m]?.qty || 0), 0);
+        tbody += `<td style="text-align:right;background:rgba(200,245,90,0.06);border-left:1px solid var(--border2)">${qAmt ? `<div style="font-family:var(--mono);font-size:12px">${fmtAmt(qAmt)}</div><div style="font-size:10px;color:var(--muted)">${qQty.toLocaleString()}개</div>` : '-'}</td>`;
+      });
+      tbody += '</tr>';
+    });
+  });
+
+  tbody += '</tbody>';
+  document.getElementById('pivot-pharm-table').innerHTML = thead + tbody;
+}
+
+function renderPivotItem() {
+  const item = document.getElementById('pivot-item-sel')?.value;
+  const showPct = document.getElementById('pivot-item-pct')?.checked;
+  if (!item) return;
+
+  const rows = allData.filter(r => r.item === item);
+  const pharmacies = [...new Set(rows.map(r => r.pharmacy))].sort();
+
+  const q4months = months.filter(m => m >= '2025-10' && m <= '2025-12');
+  const q1months = months.filter(m => m >= '2026-01' && m <= '2026-03');
+  const q2months = months.filter(m => m >= '2026-04' && m <= '2026-06');
+  const allMonthGroups = [
+    ...q4months.length ? [{ label: '2025 4Q', months: q4months }] : [],
+    ...q1months.length ? [{ label: '2026 1Q', months: q1months }] : [],
+    ...q2months.length ? [{ label: '2026 2Q', months: q2months }] : [],
+  ];
+  const flatMonths = [...q4months, ...q1months, ...q2months].filter(m => months.includes(m));
+
+  // pharmacy → month → {qty, amt}
+  const pharmMap = new Map();
+  pharmacies.forEach(p => {
+    const mData = {};
+    rows.filter(r => r.pharmacy === p).forEach(r => {
+      if (!mData[r.month]) mData[r.month] = { qty: 0, amt: 0 };
+      mData[r.month].qty += r.qty;
+      mData[r.month].amt += r.amount;
+    });
+    pharmMap.set(p, mData);
+  });
+
+  // Header
+  let thead = '<thead><tr><th rowspan="2">약국명</th>';
+  allMonthGroups.forEach(g => {
+    thead += `<th colspan="${g.months.length + 1}" style="text-align:center;background:var(--surface2);border-left:1px solid var(--border2)">${g.label}</th>`;
+  });
+  thead += '</tr><tr>';
+  allMonthGroups.forEach(g => {
+    g.months.forEach(m => {
+      thead += `<th style="text-align:right;border-left:1px solid var(--border2)">${m.slice(5)}월</th>`;
+    });
+    thead += `<th style="text-align:right;background:rgba(200,245,90,0.06);border-left:1px solid var(--border2)">합계</th>`;
+  });
+  thead += '</tr></thead>';
+
+  // Body
+  let tbody = '<tbody>';
+  // Grand total row
+  let grandAmts = {};
+  flatMonths.forEach(m => grandAmts[m] = 0);
+  pharmMap.forEach(mData => flatMonths.forEach(m => { grandAmts[m] += mData[m]?.amt || 0; }));
+
+  pharmMap.forEach((mData, pharm) => {
+    tbody += '<tr>';
+    tbody += `<td style="font-weight:500">${pharm}</td>`;
+    allMonthGroups.forEach(g => {
+      g.months.forEach((m, mi) => {
+        const amt = mData[m]?.amt || 0;
+        const qty = mData[m]?.qty || 0;
+        const prev = mi > 0 ? (mData[g.months[mi-1]]?.amt || 0) : 0;
+        const cell = amt ? `<div style="font-family:var(--mono);font-size:12px">${fmtAmt(amt)}</div><div style="font-size:10px;color:var(--muted)">${qty.toLocaleString()}개</div>` : '<span style="color:var(--muted)">-</span>';
+        tbody += `<td style="text-align:right;border-left:1px solid var(--border2)">${cell}${showPct && mi > 0 && amt && prev ? fmtPct(amt, prev) : ''}</td>`;
+      });
+      const qAmt = g.months.reduce((s, m) => s + (mData[m]?.amt || 0), 0);
+      const qQty = g.months.reduce((s, m) => s + (mData[m]?.qty || 0), 0);
+      tbody += `<td style="text-align:right;background:rgba(200,245,90,0.06);border-left:1px solid var(--border2)">${qAmt ? `<div style="font-family:var(--mono);font-size:12px">${fmtAmt(qAmt)}</div><div style="font-size:10px;color:var(--muted)">${qQty.toLocaleString()}개</div>` : '-'}</td>`;
+    });
+    tbody += '</tr>';
+  });
+
+  // Total row
+  tbody += '<tr style="background:rgba(200,245,90,0.06)">';
+  tbody += '<td style="font-weight:600;color:var(--accent)">전체 합계</td>';
+  allMonthGroups.forEach(g => {
+    g.months.forEach((m, mi) => {
+      const amt = grandAmts[m] || 0;
+      const prev = mi > 0 ? (grandAmts[g.months[mi-1]] || 0) : 0;
+      const qtyTotal = rows.filter(r => r.month === m).reduce((s,r) => s+r.qty, 0);
+      const cell = amt ? `<div style="font-family:var(--mono);font-size:12px;font-weight:500">${fmtAmt(amt)}</div><div style="font-size:10px;color:var(--muted)">${qtyTotal.toLocaleString()}개</div>` : '-';
+      tbody += `<td style="text-align:right;border-left:1px solid var(--border2)">${cell}${showPct && mi > 0 && amt && prev ? fmtPct(amt, prev) : ''}</td>`;
+    });
+    const qAmt = g.months.reduce((s, m) => s + (grandAmts[m] || 0), 0);
+    const qQty = g.months.reduce((s, m) => s + rows.filter(r => r.month === m).reduce((a,r) => a+r.qty, 0), 0);
+    tbody += `<td style="text-align:right;background:rgba(200,245,90,0.1);font-weight:600;border-left:1px solid var(--border2)">${qAmt ? `<div style="font-family:var(--mono);font-size:12px">${fmtAmt(qAmt)}</div><div style="font-size:10px;color:var(--muted)">${qQty.toLocaleString()}개</div>` : '-'}</td>`;
+  });
+  tbody += '</tr></tbody>';
+
+  document.getElementById('pivot-item-table').innerHTML = thead + tbody;
+}
+// ── END PIVOT ──────────────────────────────────────────────────
   const byMonth = months.map(m => ({
     m,
     cnt: allData.filter(r => r.month === m).length,
