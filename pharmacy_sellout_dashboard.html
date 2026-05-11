@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>약국 셀아웃 대시보드</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Noto+Sans+KR:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+:root {
+  --bg: #0f0f11;
+  --surface: #17171a;
+  --surface2: #1e1e22;
+  --border: rgba(255,255,255,0.07);
+  --border2: rgba(255,255,255,0.13);
+  --text: #f0efe8;
+  --muted: #7a7a82;
+  --accent: #c8f55a;
+  --accent2: #5af5c8;
+  --accent3: #f5a55a;
+  --accent4: #a55af5;
+  --danger: #f55a5a;
+  --mono: 'DM Mono', monospace;
+  --sans: 'Noto Sans KR', sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14px; min-height: 100vh; }
+
+.shell { display: grid; grid-template-columns: 200px 1fr; min-height: 100vh; }
+.sidebar { background: var(--surface); border-right: 1px solid var(--border); padding: 24px 0; display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+.logo { padding: 0 20px 24px; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+.logo-text { font-family: var(--mono); font-size: 13px; color: var(--accent); letter-spacing: 0.05em; }
+.logo-sub { font-size: 10px; color: var(--muted); margin-top: 3px; letter-spacing: 0.08em; text-transform: uppercase; }
+.nav-label { font-size: 10px; color: var(--muted); letter-spacing: 0.12em; text-transform: uppercase; padding: 0 20px; margin-bottom: 8px; }
+.nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 20px; cursor: pointer; font-size: 13px; color: var(--muted); transition: all 0.15s; border-left: 2px solid transparent; }
+.nav-item:hover { color: var(--text); background: var(--surface2); }
+.nav-item.active { color: var(--accent); border-left-color: var(--accent); background: rgba(200,245,90,0.06); }
+.nav-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+.sidebar-bottom { margin-top: auto; padding: 20px; border-top: 1px solid var(--border); }
+.month-chips { display: flex; flex-direction: column; gap: 4px; max-height: 200px; overflow-y: auto; }
+.month-chip { font-family: var(--mono); font-size: 11px; padding: 5px 10px; border-radius: 4px; border: 1px solid var(--border2); color: var(--muted); cursor: pointer; transition: all 0.15s; }
+.month-chip:hover { border-color: var(--accent); color: var(--accent); }
+.month-chip.active { background: rgba(200,245,90,0.1); border-color: var(--accent); color: var(--accent); }
+
+.main { display: flex; flex-direction: column; min-height: 100vh; }
+.topbar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 16px 28px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10; }
+.page-title { font-size: 16px; font-weight: 600; }
+.topbar-right { display: flex; align-items: center; gap: 12px; }
+.upload-btn { display: flex; align-items: center; gap: 7px; background: var(--accent); color: #0f0f11; font-family: var(--mono); font-size: 12px; font-weight: 500; padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; transition: opacity 0.15s; }
+.upload-btn:hover { opacity: 0.85; }
+.clear-btn { display: flex; align-items: center; gap: 7px; background: transparent; color: var(--danger); font-family: var(--mono); font-size: 12px; padding: 8px 14px; border-radius: 6px; border: 1px solid rgba(245,90,90,0.3); cursor: pointer; transition: all 0.15s; }
+.clear-btn:hover { background: rgba(245,90,90,0.1); }
+.month-badge { font-family: var(--mono); font-size: 11px; color: var(--muted); background: var(--surface2); border: 1px solid var(--border2); padding: 5px 12px; border-radius: 4px; }
+input[type=file] { display: none; }
+
+.content { flex: 1; padding: 24px 28px; }
+
+.kpi-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px; }
+.kpi-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; position: relative; overflow: hidden; }
+.kpi-card::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; }
+.kpi-card.k1::before { background: var(--accent); }
+.kpi-card.k2::before { background: var(--accent2); }
+.kpi-card.k3::before { background: var(--accent3); }
+.kpi-card.k4::before { background: var(--accent4); }
+.kpi-label { font-size: 11px; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 10px; }
+.kpi-value { font-family: var(--mono); font-size: 24px; font-weight: 500; color: var(--text); }
+.kpi-sub { font-size: 11px; color: var(--muted); margin-top: 6px; }
+.delta { font-family: var(--mono); font-size: 11px; }
+.delta.up { color: var(--accent); }
+.delta.dn { color: var(--danger); }
+
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+.grid-3 { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+.card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.card-title { font-size: 12px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.card-select { background: var(--surface2); border: 1px solid var(--border2); color: var(--text); font-size: 12px; padding: 4px 8px; border-radius: 5px; font-family: var(--mono); }
+.chart-box { position: relative; }
+
+.item-table { width: 100%; border-collapse: collapse; }
+.item-table th { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); padding: 6px 8px; border-bottom: 1px solid var(--border); text-align: left; font-weight: 400; }
+.item-table td { padding: 9px 8px; border-bottom: 1px solid var(--border); font-size: 13px; }
+.item-table tr:last-child td { border-bottom: none; }
+.item-table tr:hover td { background: var(--surface2); }
+.rank-num { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+.bar-cell { display: flex; align-items: center; gap: 8px; }
+.mini-bar-bg { flex: 1; height: 4px; background: var(--surface2); border-radius: 2px; }
+.mini-bar { height: 4px; border-radius: 2px; }
+.amt-val { font-family: var(--mono); font-size: 12px; color: var(--accent); white-space: nowrap; }
+.qty-val { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+
+.pharm-list { display: flex; flex-direction: column; gap: 8px; }
+.pharm-row { display: flex; align-items: center; gap: 10px; }
+.pharm-rank { font-family: var(--mono); font-size: 11px; color: var(--muted); width: 18px; flex-shrink: 0; }
+.pharm-name { font-size: 13px; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pharm-bar-bg { width: 80px; height: 4px; background: var(--surface2); border-radius: 2px; flex-shrink: 0; }
+.pharm-bar { height: 4px; border-radius: 2px; background: var(--accent2); }
+.pharm-amt { font-family: var(--mono); font-size: 11px; color: var(--muted); width: 55px; text-align: right; flex-shrink: 0; }
+
+.empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh; gap: 16px; }
+.empty-icon { font-size: 56px; opacity: 0.15; }
+.empty-title { font-size: 20px; font-weight: 500; }
+.empty-desc { font-size: 13px; color: var(--muted); text-align: center; line-height: 1.8; }
+.empty-upload { display: flex; align-items: center; gap: 8px; background: var(--accent); color: #0f0f11; font-family: var(--mono); font-size: 13px; font-weight: 500; padding: 12px 28px; border-radius: 8px; border: none; cursor: pointer; transition: opacity 0.15s; }
+.empty-upload:hover { opacity: 0.85; }
+.sample-btn { background: var(--surface2); color: var(--text); font-family: var(--mono); font-size: 12px; padding: 10px 20px; border-radius: 8px; border: 1px solid var(--border2); cursor: pointer; transition: all 0.15s; }
+.sample-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+.data-tag { display: inline-flex; align-items: center; gap: 5px; font-family: var(--mono); font-size: 10px; color: var(--accent2); background: rgba(90,245,200,0.08); border: 1px solid rgba(90,245,200,0.2); padding: 3px 8px; border-radius: 4px; }
+.data-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--accent2); animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+.trend-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
+.legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); }
+.legend-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+.data-month-grid { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+.data-month-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; min-width: 130px; }
+.data-month-label { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+.data-month-amt { font-family: var(--mono); font-size: 16px; font-weight: 500; color: var(--accent); }
+.data-month-rows { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+@media (max-width: 768px) {
+  .shell { grid-template-columns: 1fr; }
+  .sidebar { display: none; }
+  .kpi-strip { grid-template-columns: repeat(2, 1fr); }
+  .grid-2, .grid-3 { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-text">SELLOUT</div>
+      <div class="logo-sub">Pharmacy Analytics</div>
+    </div>
+    <div class="nav-label">메뉴</div>
+    <div style="margin-bottom:8px"></div>
+    <div class="nav-item active" onclick="showView('dashboard')"><span class="nav-dot"></span>대시보드</div>
+    <div class="nav-item" onclick="showView('items')"><span class="nav-dot"></span>품목 분석</div>
+    <div class="nav-item" onclick="showView('pharmacy')"><span class="nav-dot"></span>약국 분석</div>
+    <div class="nav-item" onclick="showView('data')"><span class="nav-dot"></span>데이터 관리</div>
+
+    <div class="sidebar-bottom">
+      <div class="nav-label" style="margin-bottom:8px">월별 필터</div>
+      <div id="month-chips" class="month-chips">
+        <div class="month-chip active" onclick="filterMonth('__all__', this)">전체 기간</div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="page-title" id="page-title">대시보드</div>
+      <div class="topbar-right">
+        <div class="data-tag" id="data-tag" style="display:none"><span class="data-dot"></span><span id="data-rows">0행</span></div>
+        <div class="month-badge" id="period-badge">데이터 없음</div>
+        <button class="clear-btn" id="clear-btn" onclick="clearData()" style="display:none">초기화</button>
+        <label class="upload-btn">
+          ↑ 엑셀 업로드
+          <input type="file" id="excel-file" accept=".xlsx,.xls" onchange="handleUpload(event)">
+        </label>
+      </div>
+    </div>
+
+    <div class="content">
+      <!-- EMPTY -->
+      <div id="empty-state" class="empty-state">
+        <div class="empty-icon">📊</div>
+        <div class="empty-title">셀아웃 데이터를 업로드해 주세요</div>
+        <div class="empty-desc">
+          매월 엑셀 파일을 업로드하면 자동으로 누적됩니다.<br>
+          약국명, 품목명, 수량, 금액 컬럼이 포함된 파일을 사용하세요.<br>
+          데이터는 브라우저에 저장되어 새로고침 후에도 유지됩니다.
+        </div>
+        <label class="empty-upload">
+          ↑ 엑셀 파일 업로드
+          <input type="file" accept=".xlsx,.xls" onchange="handleUpload(event)">
+        </label>
+        <button class="sample-btn" onclick="loadSample()">샘플 데이터로 미리보기</button>
+      </div>
+
+      <!-- DASHBOARD -->
+      <div id="view-dashboard" style="display:none">
+        <div class="kpi-strip">
+          <div class="kpi-card k1">
+            <div class="kpi-label">총 판매금액</div>
+            <div class="kpi-value" id="kpi-amount" style="font-size:16px">—</div>
+            <div class="kpi-sub"><span class="delta" id="kpi-amount-delta"></span></div>
+          </div>
+          <div class="kpi-card k2">
+            <div class="kpi-label">총 판매수량</div>
+            <div class="kpi-value" id="kpi-qty">—</div>
+            <div class="kpi-sub"><span class="delta" id="kpi-qty-delta"></span></div>
+          </div>
+          <div class="kpi-card k3">
+            <div class="kpi-label">활성 약국</div>
+            <div class="kpi-value" id="kpi-pharmacies">—</div>
+            <div class="kpi-sub" style="color:var(--muted)">개소</div>
+          </div>
+          <div class="kpi-card k4">
+            <div class="kpi-label">취급 품목</div>
+            <div class="kpi-value" id="kpi-items">—</div>
+            <div class="kpi-sub" style="color:var(--muted)">개</div>
+          </div>
+        </div>
+        <div class="grid-3">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">품목별 판매금액 TOP 10</div>
+              <select class="card-select" id="dash-month-sel" onchange="renderDashboard()"><option value="__all__">전체</option></select>
+            </div>
+            <div class="chart-box" style="height:260px"><canvas id="item-bar-chart" role="img" aria-label="품목별 판매금액 TOP10"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><div class="card-title">약국별 점유율</div></div>
+            <div class="chart-box" style="height:260px"><canvas id="pharm-pie-chart" role="img" aria-label="약국별 점유율"></canvas></div>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-header"><div class="card-title">품목별 월별 판매 추이 (TOP 5)</div></div>
+            <div class="trend-legend" id="trend-legend"></div>
+            <div class="chart-box" style="height:200px"><canvas id="trend-chart" role="img" aria-label="월별 판매 추이"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><div class="card-title">약국 실적 순위</div></div>
+            <div id="pharm-rank-list" class="pharm-list"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ITEMS -->
+      <div id="view-items" style="display:none">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">품목별 성과 현황</div>
+            <select class="card-select" id="items-month-sel" onchange="renderItems()"><option value="__all__">전체 기간</option></select>
+          </div>
+          <div style="overflow-x:auto">
+            <table class="item-table">
+              <thead><tr><th>#</th><th>품목명</th><th>판매금액</th><th>점유율</th><th>판매수량</th><th>전월 대비</th></tr></thead>
+              <tbody id="items-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- PHARMACY -->
+      <div id="view-pharmacy" style="display:none">
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">약국별 실적 비교</div>
+              <select class="card-select" id="pharm-month-sel" onchange="renderPharmacyView()"><option value="__all__">전체</option></select>
+            </div>
+            <div class="chart-box" id="pharm-bar-wrap" style="height:300px"><canvas id="pharm-bar-chart" role="img" aria-label="약국별 판매금액"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><div class="card-title">약국 상세</div></div>
+            <div style="overflow-x:auto">
+              <table class="item-table">
+                <thead><tr><th>#</th><th>약국명</th><th>금액</th><th>수량</th><th>전월비</th></tr></thead>
+                <tbody id="pharm-detail-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- DATA -->
+      <div id="view-data" style="display:none">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">누적 데이터 현황</div>
+            <div style="font-family:var(--mono);font-size:11px;color:var(--muted)" id="total-rows-label"></div>
+          </div>
+          <div class="data-month-grid" id="data-month-grid"></div>
+          <div style="overflow-x:auto">
+            <table class="item-table">
+              <thead><tr><th>월</th><th>약국명</th><th>품목명</th><th>수량</th><th>금액</th></tr></thead>
+              <tbody id="raw-tbody"></tbody>
+            </table>
+          </div>
+          <div style="font-size:11px;color:var(--muted);margin-top:12px" id="raw-note"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const COLORS = ['#c8f55a','#5af5c8','#f5a55a','#a55af5','#f55a5a','#5ac8f5','#f5c85a','#c85af5','#5af55a','#f55ac8','#5a5af5','#f5f55a'];
+let allData = [], months = [], selectedMonth = '__all__', currentView = 'dashboard';
+let charts = {};
+
+// STORAGE
+function save() {
+  try { localStorage.setItem('sellout_v2', JSON.stringify(allData)); } catch(e) {}
+}
+function load() {
+  try { const d = localStorage.getItem('sellout_v2'); return d ? JSON.parse(d) : []; } catch(e) { return []; }
+}
+
+window.onload = () => {
+  allData = load();
+  if (allData.length) { processMonths(); showDashboard(); }
+};
+
+function handleUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const wb = XLSX.read(ev.target.result, { type: 'binary' });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    mergeData(XLSX.utils.sheet_to_json(ws));
+  };
+  reader.readAsBinaryString(file);
+  e.target.value = '';
+}
+
+function detectCols(data) {
+  const keys = Object.keys(data[0] || {});
+  const find = (...c) => keys.find(k => c.some(x => k.includes(x)));
+  return {
+    pharmacy: find('약국','병원','매장','거래처'),
+    item: find('품목','제품','상품','약품'),
+    qty: find('수량','갯수','개수','qty','Qty'),
+    amount: find('금액','매출','amount','판매액','Amount'),
+    month: find('월','month','날짜','일자','date','기간','Month')
+  };
+}
+
+function mergeData(raw) {
+  const cols = detectCols(raw);
+  if (!cols.pharmacy || !cols.item) {
+    alert('컬럼 인식 실패\n약국명, 품목명 컬럼명을 확인해 주세요.');
+    return;
+  }
+  const newRows = raw.map(r => ({
+    month: cols.month ? String(r[cols.month] || '').slice(0, 7) : '미상',
+    pharmacy: String(r[cols.pharmacy] || '').trim(),
+    item: String(r[cols.item] || '').trim(),
+    qty: Number(r[cols.qty]) || 0,
+    amount: Number(r[cols.amount]) || 0
+  })).filter(r => r.pharmacy && r.item);
+
+  const map = new Map();
+  [...allData, ...newRows].forEach(r => {
+    const k = `${r.month}||${r.pharmacy}||${r.item}`;
+    if (map.has(k)) { const ex = map.get(k); ex.qty += r.qty; ex.amount += r.amount; }
+    else map.set(k, { ...r });
+  });
+  allData = [...map.values()];
+  save();
+  processMonths();
+  showDashboard();
+}
+
+function loadSample() {
+  const pharmacies = ['강남약국','서초약국','역삼약국','신사약국','논현약국','압구정약국','청담약국','도곡약국'];
+  const items = ['비타민C','오메가3','루테인','프로바이오틱스','마그네슘','콜라겐','홍삼','코엔자임Q10','칼슘','아연','밀크씨슬','엽산','B컴플렉스','글루타치온','알파리포산'];
+  const monthList = ['2024-01','2024-02','2024-03','2024-04','2024-05','2024-06'];
+  const rows = [];
+  monthList.forEach(m => {
+    pharmacies.forEach(ph => {
+      const cnt = Math.floor(Math.random() * 7) + 4;
+      [...items].sort(() => Math.random() - 0.5).slice(0, cnt).forEach(it => {
+        const qty = Math.floor(Math.random() * 80) + 10;
+        const price = (Math.floor(Math.random() * 20) + 5) * 1000;
+        rows.push({ 월: m, 약국명: ph, 품목명: it, 수량: qty, 금액: qty * price });
+      });
+    });
+  });
+  mergeData(rows);
+}
+
+function clearData() {
+  if (!confirm('모든 데이터를 삭제하시겠습니까?')) return;
+  allData = [];
+  months = [];
+  localStorage.removeItem('sellout_v2');
+  ['dashboard','items','pharmacy','data'].forEach(v => {
+    const el = document.getElementById('view-' + v);
+    if (el) el.style.display = 'none';
+  });
+  document.getElementById('empty-state').style.display = 'flex';
+  document.getElementById('data-tag').style.display = 'none';
+  document.getElementById('clear-btn').style.display = 'none';
+  document.getElementById('period-badge').textContent = '데이터 없음';
+}
+
+function processMonths() {
+  months = [...new Set(allData.map(r => r.month))].filter(m => m && m !== '미상').sort();
+  buildMonthUI();
+}
+
+function buildMonthUI() {
+  const chips = document.getElementById('month-chips');
+  chips.innerHTML = `<div class="month-chip active" onclick="filterMonth('__all__', this)">전체 기간</div>` +
+    months.map(m => `<div class="month-chip" onclick="filterMonth('${m}', this)">${m}</div>`).join('');
+  const opts = '<option value="__all__">전체</option>' + months.map(m => `<option value="${m}">${m}</option>`).join('');
+  ['dash-month-sel','items-month-sel','pharm-month-sel'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = opts;
+  });
+}
+
+function filterMonth(m, el) {
+  selectedMonth = m;
+  document.querySelectorAll('.month-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  renderCurrentView();
+}
+
+function showDashboard() {
+  document.getElementById('empty-state').style.display = 'none';
+  document.getElementById('data-tag').style.display = 'inline-flex';
+  document.getElementById('clear-btn').style.display = 'flex';
+  document.getElementById('data-rows').textContent = allData.length.toLocaleString() + '행';
+  if (months.length) {
+    document.getElementById('period-badge').textContent = months.length === 1
+      ? months[0] : months[0] + ' ~ ' + months[months.length - 1];
+  }
+  showView('dashboard');
+}
+
+function showView(view) {
+  currentView = view;
+  ['dashboard','items','pharmacy','data'].forEach(v => {
+    document.getElementById('view-' + v).style.display = v === view ? 'block' : 'none';
+  });
+  document.querySelectorAll('.nav-item').forEach((el, i) => {
+    el.classList.toggle('active', ['dashboard','items','pharmacy','data'][i] === view);
+  });
+  document.getElementById('page-title').textContent = { dashboard:'대시보드', items:'품목 분석', pharmacy:'약국 분석', data:'데이터 관리' }[view];
+  renderCurrentView();
+}
+
+function renderCurrentView() {
+  if (!allData.length) return;
+  if (currentView === 'dashboard') renderDashboard();
+  if (currentView === 'items') renderItems();
+  if (currentView === 'pharmacy') renderPharmacyView();
+  if (currentView === 'data') renderDataView();
+}
+
+function filtered(m) {
+  const mm = m || selectedMonth;
+  return mm === '__all__' ? allData : allData.filter(r => r.month === mm);
+}
+
+function destroyChart(key) {
+  if (charts[key]) { charts[key].destroy(); charts[key] = null; }
+}
+
+function renderDashboard() {
+  const m = document.getElementById('dash-month-sel')?.value || selectedMonth;
+  const data = filtered(m);
+  const prevM = m !== '__all__' ? months[months.indexOf(m) - 1] : null;
+  const prevData = prevM ? allData.filter(r => r.month === prevM) : [];
+
+  const totalAmt = data.reduce((s, r) => s + r.amount, 0);
+  const totalQty = data.reduce((s, r) => s + r.qty, 0);
+  const prevAmt = prevData.reduce((s, r) => s + r.amount, 0);
+  const prevQty = prevData.reduce((s, r) => s + r.qty, 0);
+
+  document.getElementById('kpi-amount').textContent = '₩' + totalAmt.toLocaleString();
+  document.getElementById('kpi-qty').textContent = totalQty.toLocaleString();
+  document.getElementById('kpi-pharmacies').textContent = new Set(data.map(r => r.pharmacy)).size;
+  document.getElementById('kpi-items').textContent = new Set(data.map(r => r.item)).size;
+
+  function setDelta(id, curr, prev) {
+    if (!prev) return;
+    const d = ((curr - prev) / prev * 100).toFixed(1);
+    const el = document.getElementById(id);
+    el.textContent = (d >= 0 ? '▲ ' : '▼ ') + Math.abs(d) + '% 전월비';
+    el.className = 'delta ' + (d >= 0 ? 'up' : 'dn');
+  }
+  setDelta('kpi-amount-delta', totalAmt, prevAmt);
+  setDelta('kpi-qty-delta', totalQty, prevQty);
+
+  // Item bar
+  const itemTotals = [...new Set(data.map(r => r.item))].map(it => ({
+    it, amt: data.filter(r => r.item === it).reduce((s, r) => s + r.amount, 0)
+  })).sort((a, b) => b.amt - a.amt).slice(0, 10);
+
+  destroyChart('itemBar');
+  charts.itemBar = new Chart(document.getElementById('item-bar-chart'), {
+    type: 'bar',
+    data: {
+      labels: itemTotals.map(r => r.it),
+      datasets: [{ data: itemTotals.map(r => r.amt), backgroundColor: COLORS.slice(0, 10).map(c => c + 'bb'), borderRadius: 3, borderSkipped: false }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { font: { size: 10 }, color: '#7a7a82' }, grid: { color: 'rgba(255,255,255,0.04)' } },
+        y: { ticks: { font: { size: 10 }, color: '#7a7a82', callback: v => '₩' + (v / 1e4).toFixed(0) + '만' }, grid: { color: 'rgba(255,255,255,0.04)' } }
+      }
+    }
+  });
+
+  // Pharm pie
+  const pharmTotals = [...new Set(data.map(r => r.pharmacy))].map(ph => ({
+    ph, amt: data.filter(r => r.pharmacy === ph).reduce((s, r) => s + r.amount, 0)
+  })).sort((a, b) => b.amt - a.amt);
+
+  destroyChart('pharmPie');
+  charts.pharmPie = new Chart(document.getElementById('pharm-pie-chart'), {
+    type: 'doughnut',
+    data: {
+      labels: pharmTotals.map(r => r.ph),
+      datasets: [{ data: pharmTotals.map(r => r.amt), backgroundColor: COLORS.slice(0, pharmTotals.length).map(c => c + 'cc'), borderWidth: 0, hoverOffset: 4 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '65%',
+      plugins: { legend: { display: true, position: 'right', labels: { font: { size: 10 }, color: '#7a7a82', boxWidth: 8, padding: 8 } } }
+    }
+  });
+
+  // Trend
+  const topItems = [...new Set(allData.map(r => r.item))].map(it => ({
+    it, total: allData.filter(r => r.item === it).reduce((s, r) => s + r.amount, 0)
+  })).sort((a, b) => b.total - a.total).slice(0, 5).map(r => r.it);
+
+  document.getElementById('trend-legend').innerHTML = topItems.map((it, i) =>
+    `<span class="legend-item"><span class="legend-dot" style="background:${COLORS[i]}"></span>${it}</span>`).join('');
+
+  destroyChart('trend');
+  charts.trend = new Chart(document.getElementById('trend-chart'), {
+    type: 'line',
+    data: {
+      labels: months,
+      datasets: topItems.map((it, i) => ({
+        label: it,
+        data: months.map(mm => allData.filter(r => r.item === it && r.month === mm).reduce((s, r) => s + r.amount, 0)),
+        borderColor: COLORS[i], backgroundColor: 'transparent', tension: 0.35,
+        pointRadius: 3, pointBackgroundColor: COLORS[i], borderWidth: 1.5
+      }))
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { font: { size: 10 }, color: '#7a7a82' }, grid: { color: 'rgba(255,255,255,0.04)' } },
+        y: { ticks: { font: { size: 10 }, color: '#7a7a82', callback: v => '₩' + (v / 1e4).toFixed(0) + '만' }, grid: { color: 'rgba(255,255,255,0.04)' } }
+      }
+    }
+  });
+
+  // Pharm rank
+  const maxAmt = pharmTotals[0]?.amt || 1;
+  document.getElementById('pharm-rank-list').innerHTML = pharmTotals.slice(0, 8).map((r, i) => `
+    <div class="pharm-row">
+      <span class="pharm-rank">${i + 1}</span>
+      <span class="pharm-name">${r.ph}</span>
+      <div class="pharm-bar-bg"><div class="pharm-bar" style="width:${Math.round(r.amt / maxAmt * 100)}%"></div></div>
+      <span class="pharm-amt">₩${(r.amt / 1e4).toFixed(0)}만</span>
+    </div>`).join('');
+}
+
+function renderItems() {
+  const m = document.getElementById('items-month-sel')?.value || selectedMonth;
+  const data = filtered(m);
+  const prevM = m !== '__all__' ? months[months.indexOf(m) - 1] : null;
+  const prevData = prevM ? allData.filter(r => r.month === prevM) : [];
+  const totalAmt = data.reduce((s, r) => s + r.amount, 0) || 1;
+
+  const rows = [...new Set(data.map(r => r.item))].map(it => {
+    const amt = data.filter(r => r.item === it).reduce((s, r) => s + r.amount, 0);
+    const qty = data.filter(r => r.item === it).reduce((s, r) => s + r.qty, 0);
+    const prev = prevData.filter(r => r.item === it).reduce((s, r) => s + r.amount, 0);
+    return { it, amt, qty, prev, share: (amt / totalAmt * 100) };
+  }).sort((a, b) => b.amt - a.amt);
+
+  const maxAmt = rows[0]?.amt || 1;
+  document.getElementById('items-tbody').innerHTML = rows.map((r, i) => {
+    let delta = '';
+    if (r.prev) {
+      const d = ((r.amt - r.prev) / r.prev * 100).toFixed(1);
+      delta = `<span style="font-family:var(--mono);font-size:11px;color:${d >= 0 ? 'var(--accent)' : 'var(--danger)'}">${d >= 0 ? '▲' : '▼'} ${Math.abs(d)}%</span>`;
+    }
+    return `<tr>
+      <td class="rank-num">${i + 1}</td>
+      <td>${r.it}</td>
+      <td><div class="bar-cell"><div class="mini-bar-bg"><div class="mini-bar" style="width:${Math.round(r.amt / maxAmt * 100)}%;background:${COLORS[i % COLORS.length]}"></div></div><span class="amt-val" style="color:${COLORS[i % COLORS.length]}">₩${(r.amt / 1e4).toFixed(0)}만</span></div></td>
+      <td class="qty-val">${r.share.toFixed(1)}%</td>
+      <td class="qty-val">${r.qty.toLocaleString()}개</td>
+      <td>${delta}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderPharmacyView() {
+  const m = document.getElementById('pharm-month-sel')?.value || selectedMonth;
+  const data = filtered(m);
+  const prevM = m !== '__all__' ? months[months.indexOf(m) - 1] : null;
+  const prevData = prevM ? allData.filter(r => r.month === prevM) : [];
+
+  const rows = [...new Set(data.map(r => r.pharmacy))].map(ph => {
+    const amt = data.filter(r => r.pharmacy === ph).reduce((s, r) => s + r.amount, 0);
+    const qty = data.filter(r => r.pharmacy === ph).reduce((s, r) => s + r.qty, 0);
+    const prev = prevData.filter(r => r.pharmacy === ph).reduce((s, r) => s + r.amount, 0);
+    return { ph, amt, qty, prev };
+  }).sort((a, b) => b.amt - a.amt);
+
+  destroyChart('pharmBar');
+  const wrap = document.getElementById('pharm-bar-wrap');
+  wrap.style.height = Math.max(200, rows.length * 42 + 60) + 'px';
+  charts.pharmBar = new Chart(document.getElementById('pharm-bar-chart'), {
+    type: 'bar',
+    data: {
+      labels: rows.map(r => r.ph),
+      datasets: [{ data: rows.map(r => r.amt), backgroundColor: COLORS.slice(0, rows.length).map(c => c + 'bb'), borderRadius: 3, borderSkipped: false }]
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { font: { size: 10 }, color: '#7a7a82', callback: v => '₩' + (v / 1e4).toFixed(0) + '만' }, grid: { color: 'rgba(255,255,255,0.04)' } },
+        y: { ticks: { font: { size: 11 }, color: '#f0efe8' }, grid: { display: false } }
+      }
+    }
+  });
+
+  document.getElementById('pharm-detail-tbody').innerHTML = rows.map((r, i) => {
+    let delta = '';
+    if (r.prev) {
+      const d = ((r.amt - r.prev) / r.prev * 100).toFixed(1);
+      delta = `<span style="font-family:var(--mono);font-size:10px;color:${d >= 0 ? 'var(--accent)' : 'var(--danger)'}">${d >= 0 ? '▲' : '▼'} ${Math.abs(d)}%</span>`;
+    }
+    return `<tr><td class="rank-num">${i + 1}</td><td>${r.ph}</td><td class="amt-val">₩${(r.amt / 1e4).toFixed(0)}만</td><td class="qty-val">${r.qty.toLocaleString()}</td><td>${delta}</td></tr>`;
+  }).join('');
+}
+
+function renderDataView() {
+  const byMonth = months.map(m => ({
+    m,
+    cnt: allData.filter(r => r.month === m).length,
+    amt: allData.filter(r => r.month === m).reduce((s, r) => s + r.amount, 0)
+  }));
+  document.getElementById('data-month-grid').innerHTML = byMonth.map(r => `
+    <div class="data-month-card">
+      <div class="data-month-label">${r.m}</div>
+      <div class="data-month-amt">₩${(r.amt / 1e6).toFixed(1)}M</div>
+      <div class="data-month-rows">${r.cnt.toLocaleString()}행</div>
+    </div>`).join('');
+
+  document.getElementById('total-rows-label').textContent = '총 ' + allData.length.toLocaleString() + '행 (최근 200행 표시)';
+  const sample = allData.slice(0, 200);
+  document.getElementById('raw-tbody').innerHTML = sample.map(r =>
+    `<tr><td>${r.month}</td><td>${r.pharmacy}</td><td>${r.item}</td><td>${r.qty.toLocaleString()}</td><td>₩${r.amount.toLocaleString()}</td></tr>`
+  ).join('');
+  if (allData.length > 200) {
+    document.getElementById('raw-note').textContent = `* 전체 ${allData.length.toLocaleString()}행 중 200행만 표시됩니다.`;
+  }
+}
+</script>
+</body>
+</html>
