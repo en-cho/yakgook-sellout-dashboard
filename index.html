@@ -595,7 +595,7 @@ function restoreData(e) {
       // 기존 데이터와 병합
       const map = new Map();
       [...allData, ...backup.data].forEach(r => {
-        const k = \`\${r.month}||\${r.pharmacy}||\${r.item}\`;
+        const k = `${r.month}||${r.pharmacy}||${r.item}`;
         if (map.has(k)) { const ex = map.get(k); ex.qty += r.qty; ex.amount += r.amount; }
         else map.set(k, { ...r });
       });
@@ -731,8 +731,8 @@ function buildMonthUI() {
     selectedMonth = latestMonth || '__all__';
   }
   // Data view filters
-  const dmSel = document.getElementById('data-filter-month');
-  if (dmSel) dmSel.innerHTML = '<option value="__all__">전체 월</option>' + months.map(m => `<option value="${m}">${m}</option>`).join('');
+  const dataSel = document.getElementById('data-filter-month');
+  if (dataSel) dataSel.innerHTML = '<option value="__all__">전체 월</option>' + months.map(m => `<option value="${m}">${m}</option>`).join('');
   const pharmacies = [...new Set(allData.map(r => r.pharmacy))].sort();
   const dpSel = document.getElementById('data-filter-pharm');
   if (dpSel) dpSel.innerHTML = '<option value="__all__">전체 약국</option>' + pharmacies.map(p => `<option value="${p}">${p}</option>`).join('');
