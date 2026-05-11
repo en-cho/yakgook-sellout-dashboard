@@ -1033,27 +1033,6 @@ function renderPivotItem() {
   document.getElementById('pivot-item-table').innerHTML = thead + tbody;
 }
 // ── END PIVOT ──────────────────────────────────────────────────
-  const byMonth = months.map(m => ({
-    m,
-    cnt: allData.filter(r => r.month === m).length,
-    amt: allData.filter(r => r.month === m).reduce((s, r) => s + r.amount, 0)
-  }));
-  document.getElementById('data-month-grid').innerHTML = byMonth.map(r => `
-    <div class="data-month-card">
-      <div class="data-month-label">${r.m}</div>
-      <div class="data-month-amt">₩${(r.amt / 1e6).toFixed(1)}M</div>
-      <div class="data-month-rows">${r.cnt.toLocaleString()}행</div>
-    </div>`).join('');
-
-  document.getElementById('total-rows-label').textContent = '총 ' + allData.length.toLocaleString() + '행 (최근 200행 표시)';
-  const sample = allData.slice(0, 200);
-  document.getElementById('raw-tbody').innerHTML = sample.map(r =>
-    `<tr><td>${r.month}</td><td>${r.pharmacy}</td><td>${r.item}</td><td>${r.qty.toLocaleString()}</td><td>₩${r.amount.toLocaleString()}</td></tr>`
-  ).join('');
-  if (allData.length > 200) {
-    document.getElementById('raw-note').textContent = `* 전체 ${allData.length.toLocaleString()}행 중 200행만 표시됩니다.`;
-  }
-}
 </script>
 </body>
 </html>
