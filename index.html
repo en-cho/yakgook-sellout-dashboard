@@ -152,8 +152,8 @@ input[type=file] { display: none; }
     <div style="padding:16px 20px;border-top:1px solid var(--border)">
       <div class="nav-label" style="margin-bottom:8px">브랜드 필터</div>
       <div style="display:flex;flex-direction:column;gap:4px">
-        <div class="month-chip active" id="brand-all" onclick="filterBrand('__all__',this)">전체</div>
-        <div class="month-chip" id="brand-celimax" onclick="filterBrand('celimax',this)">Celimax / 셀리맥스</div>
+        <div class="month-chip" id="brand-all" onclick="filterBrand('__all__',this)">전체 (타사 포함)</div>
+        <div class="month-chip active" id="brand-celimax" onclick="filterBrand('celimax',this)">Celimax / 셀리맥스</div>
         <div class="month-chip" id="brand-others" onclick="filterBrand('others',this)">타사 브랜드</div>
       </div>
     </div>
@@ -355,7 +355,7 @@ input[type=file] { display: none; }
 
 <script>
 const COLORS = ['#c8f55a','#5af5c8','#f5a55a','#a55af5','#f55a5a','#5ac8f5','#f5c85a','#c85af5','#5af55a','#f55ac8','#5a5af5','#f5f55a'];
-let allData = [], months = [], selectedMonth = '__all__', selectedBrand = '__all__', currentView = 'dashboard';
+let allData = [], months = [], selectedMonth = '__all__', selectedBrand = 'celimax', currentView = 'dashboard';
 let charts = {};
 
 // STORAGE
