@@ -527,7 +527,10 @@ input[type=file] { display: none; }
         <div class="card" style="margin-bottom:16px">
           <div class="card-header">
             <div class="card-title">월별 데이터 현황</div>
-            <div style="font-family:var(--mono);font-size:11px;color:var(--muted)" id="total-rows-label"></div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <div style="font-family:var(--mono);font-size:11px;color:var(--muted)" id="total-rows-label"></div>
+              <button onclick="normalizeBrands()" style="background:rgba(90,245,200,0.1);border:1px solid rgba(90,245,200,0.3);color:var(--accent2);font-family:var(--mono);font-size:11px;padding:3px 10px;border-radius:4px;cursor:pointer" title="Celimax, celimax 등을 셀리맥스로 통일">브랜드명 정규화</button>
+            </div>
           </div>
           <div class="data-month-grid" id="data-month-grid"></div>
         </div>
@@ -807,6 +810,11 @@ function renderCurrentView() {
 function isCelimax(r) {
   const name = (r.item + " " + (r.brand || "")).toLowerCase();
   return r.brand === "Celimax" || name.includes("셀리맥스") || name.includes("celimax");
+}
+
+function normalizeBrand(r) {
+  if (isCelimax(r)) return "셀리맥스";
+  return r.brand || "기타";
 }
 
 function applyBrandFilter(data) {
@@ -1129,6 +1137,20 @@ function renderPharmacyView() {
   }).join('');
 }
 
+function normalizeBrands() {
+  let count = 0;
+  allData.forEach(r => {
+    if (isCelimax(r) && r.brand !== '셀리맥스') {
+      r.brand = '셀리맥스';
+      count++;
+    }
+    if (!r.brand) r.brand = '기타';
+  });
+  save();
+  renderDataView();
+  alert(`브랜드명 정규화 완료! ${count}개 항목이 셀리맥스로 통일됐어요.`);
+}
+
 function renderDataView() {
   const byMonth = months.map(m => ({
     m, cnt: allData.filter(r => r.month === m).length,
@@ -1211,7 +1233,7 @@ function deleteRow(idx) {
 function buildPivotSelects() {
   const pharmacies = [...new Set(allData.map(r => r.pharmacy))].sort();
   const items = [...new Set(allData.map(r => r.item))].sort();
-  const brands = ['전체 브랜드', ...new Set(allData.map(r => r.brand || '기타').filter(b => b))].sort();
+  const brands = ['전체 브랜드', ...new Set(allData.map(r => normalizeBrand(r)).filter(b => b))].sort();
 
   const pharmSel = document.getElementById('pivot-pharm-sel');
   const brandSel = document.getElementById('pivot-pharm-brand-sel');
@@ -1241,12 +1263,12 @@ function renderPivotPharm() {
   if (!pharm) return;
 
   let rows = allData.filter(r => r.pharmacy === pharm);
-  if (brandFilter !== '전체 브랜드') rows = rows.filter(r => (r.brand || '기타') === brandFilter);
+  if (brandFilter !== '전체 브랜드') rows = rows.filter(r => normalizeBrand(r) === brandFilter);
 
   // get brands → items structure
   const brandMap = new Map();
   rows.forEach(r => {
-    const b = r.brand || '기타';
+    const b = normalizeBrand(r);
     if (!brandMap.has(b)) brandMap.set(b, new Map());
     const itemMap = brandMap.get(b);
     if (!itemMap.has(r.item)) itemMap.set(r.item, {});
