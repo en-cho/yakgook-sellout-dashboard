@@ -630,7 +630,7 @@ function load() {
 
 window.onload = () => {
   allData = load();
-  if (allData.length) { processMonths(); showDashboard(); }
+  if (allData.length) { processMonths(); showDashboard(); showInsightMemo('dashboard'); }
 };
 
 function handleUpload(e) {
@@ -778,6 +778,7 @@ function showDashboard() {
       ? months[0] : months[0] + ' ~ ' + months[months.length - 1];
   }
   showView('dashboard');
+  showInsightMemo('dashboard');
 }
 
 function showView(view) {
@@ -1442,7 +1443,7 @@ function showInsightMemo(view) {
   const ids = VIEW_INSIGHT_MAP[view];
   if (!ids) return;
   const bar = document.getElementById(ids.bar);
-  if (bar) bar.style.display = 'block';
+  if (bar) bar.style.display = 'grid';
   loadMemo(view);
   triggerInsight(view);
 }
